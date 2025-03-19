@@ -7,29 +7,23 @@ export default function Home() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
-  // The `useUser()` hook will be used to ensure that Clerk has loaded data about the logged in user
   const { user } = useUser();
-  // The `useSession()` hook will be used to get the Clerk session object
   const { session } = useSession();
 
-  // Create a custom supabase client that injects the Clerk Supabase token into the request headers
   function createClerkSupabaseClient() {
     return createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_KEY!,
       {
         global: {
-          // Get the custom Supabase token from Clerk
           fetch: async (url, options = {}) => {
             const clerkToken = await session?.getToken({
               template: 'supabase',
             });
 
-            // Insert the Clerk Supabase token into the headers
             const headers = new Headers(options?.headers);
             headers.set('Authorization', `Bearer ${clerkToken}`);
 
-            // Now call the default fetch
             return fetch(url, {
               ...options,
               headers,
@@ -40,11 +34,8 @@ export default function Home() {
     );
   }
 
-  // Create a `client` object for accessing Supabase data using the Clerk token
   const client = createClerkSupabaseClient();
 
-  // This `useEffect` will wait for the User object to be loaded before requesting
-  // the tasks for the logged in user
   useEffect(() => {
     if (!user) return;
 
@@ -56,14 +47,11 @@ export default function Home() {
     }
 
     loadTasks();
-  }, [user]);
+  }, [user, client]); // 修正: `client` を依存配列に追加
 
   async function createTask(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // Insert task into the "tasks" database
-    await client.from('tasks').insert({
-      name,
-    });
+    await client.from('tasks').insert({ name });
     window.location.reload();
   }
 
@@ -75,7 +63,9 @@ export default function Home() {
 
       {!loading &&
         tasks.length > 0 &&
-        tasks.map((task: any) => <p>{task.name}</p>)}
+        tasks.map((task: any) => (
+          <p key={task.id || task.name}>{task.name}</p> // 修正: `key` を追加
+        ))}
 
       {!loading && tasks.length === 0 && <p>No tasks found</p>}
 
